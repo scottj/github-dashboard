@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' 'unsafe-inline' https://api.github.com https://cdn.jsdelivr.net; img-src https://avatars.githubusercontent.com https://*.githubusercontent.com data:; connect-src https://api.github.com">
+  <title>GitHub Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    :root {
+      --section-gap: 1.5rem;
+    }
+    body { min-height: 100vh; }
+    #auth-screen, #dashboard { display: none; }
+    #auth-screen.active, #dashboard.active { display: block; }
+
+    /* Auth screen */
+    .auth-container {
+      max-width: 480px;
+      margin: 10vh auto 0;
+      text-align: center;
+    }
+    .auth-container h1 { margin-bottom: 0.5rem; }
+    .auth-container .subtitle { color: var(--muted-color); margin-bottom: 2rem; }
+    .pat-form { text-align: left; }
+    .scope-list { font-size: 0.85rem; color: var(--muted-color); }
+    .scope-list code { font-size: 0.8rem; }
+
+    /* Header */
+    .dash-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--muted-border-color);
+      margin-bottom: var(--section-gap);
+    }
+    .dash-header .user-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .dash-header .user-info img {
+      width: 32px; height: 32px; border-radius: 50%;
+    }
+    .dash-header .user-info span { font-weight: 600; }
+
+    /* Rate limit banner */
+    .rate-limit-banner {
+      display: none;
+      background: var(--del-color);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border-radius: var(--border-radius);
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+    }
+    .rate-limit-banner.visible { display: block; }
+
+    /* Settings bar */
+    .settings-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.5rem;
+      margin-bottom: var(--section-gap);
+      padding: 0.75rem 1rem;
+      background: var(--card-background-color);
+      border-radius: var(--border-radius);
+      border: 1px solid var(--muted-border-color);
+    }
+    .settings-bar label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      margin: 0;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .settings-bar input[type="checkbox"] { margin: 0; }
+
+    /* Section grid */
+    .sections-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--section-gap);
+    }
+    @media (min-width: 900px) {
+      .sections-grid { grid-template-columns: 1fr 1fr; }
+      .sections-grid .section-notifications { grid-column: 1 / -1; }
+    }
+
+    /* Section card */
+    .section-card {
+      border: 1px solid var(--muted-border-color);
+      border-radius: var(--border-radius);
+      background: var(--card-background-color);
+      overflow: hidden;
+    }
+    .section-card.hidden { display: none; }
+    .section-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--muted-border-color);
+      background: var(--card-sectionning-background-color, var(--card-background-color));
+    }
+    .section-card-header h2 {
+      margin: 0;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.4em;
+      padding: 0.1em 0.45em;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: 999px;
+      background: var(--primary);
+      color: var(--primary-inverse);
+    }
+    .section-card-header button {
+      margin: 0;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      width: auto;
+    }
+    .section-card-body {
+      padding: 0;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .section-card-footer {
+      padding: 0.4rem 1rem;
+      font-size: 0.75rem;
+      color: var(--muted-color);
+      border-top: 1px solid var(--muted-border-color);
+      text-align: right;
+    }
+
+    /* Item list */
+    .item-list { list-style: none; margin: 0; padding: 0; }
+    .item-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--muted-border-color);
+      font-size: 0.875rem;
+    }
+    .item-list li:last-child { border-bottom: none; }
+    .item-avatar {
+      width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; margin-top: 0.1rem;
+    }
+    .item-content { flex: 1; min-width: 0; }
+    .item-repo {
+      font-size: 0.75rem;
+      color: var(--muted-color);
+      margin-bottom: 0.1rem;
+    }
+    .item-title a {
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .item-title a:hover { text-decoration: underline; }
+    .item-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.25rem;
+      align-items: center;
+    }
+    .label-pill {
+      display: inline-block;
+      padding: 0.05em 0.5em;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+    .item-time {
+      font-size: 0.7rem;
+      color: var(--muted-color);
+    }
+
+    /* Notification specific */
+    .notif-group-header {
+      padding: 0.5rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--card-sectionning-background-color, var(--card-background-color));
+      border-bottom: 1px solid var(--muted-border-color);
+    }
+    .notif-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid var(--muted-border-color);
+      font-size: 0.85rem;
+    }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-unread { font-weight: 600; }
+    .notif-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--primary); flex-shrink: 0;
+    }
+    .notif-dot.read { background: transparent; }
+    .notif-item .item-time { margin-left: auto; white-space: nowrap; }
+    .notif-item button {
+      margin: 0; padding: 0.15rem 0.4rem;
+      font-size: 0.65rem; width: auto;
+    }
+
+    /* Spinner */
+    .spinner {
+      display: flex;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .spinner::after {
+      content: '';
+      width: 24px; height: 24px;
+      border: 3px solid var(--muted-border-color);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Empty / error states */
+    .empty-state, .error-state {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: var(--muted-color);
+      font-size: 0.85rem;
+    }
+    .error-state { color: var(--del-color); }
+    .error-state button {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      width: auto;
+      display: inline-block;
+    }
+
+    /* Auth error message */
+    .auth-error {
+      display: none;
+      color: var(--del-color);
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+    .auth-error.visible { display: block; }
+
+    /* Device flow */
+    .device-flow-info {
+      display: none;
+      margin-top: 1rem;
+      text-align: center;
+    }
+    .device-flow-info.active { display: block; }
+    .user-code {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      font-family: monospace;
+      margin: 0.5rem 0;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+
+    <!-- Auth Screen -->
+    <div id="auth-screen">
+      <div class="auth-container">
+        <h1>GitHub Dashboard</h1>
+        <p class="subtitle">See what needs your attention across all your repos.</p>
+
+        <div id="device-flow-section" style="display:none; margin-bottom: 1.5rem;">
+          <button id="device-flow-btn" class="contrast">Sign in with GitHub</button>
+          <div id="device-flow-info" class="device-flow-info">
+            <p>Go to <a href="https://github.com/login/device" target="_blank" rel="noopener">github.com/login/device</a> and enter this code:</p>
+            <div id="user-code" class="user-code"></div>
+            <p><small>Waiting for authorization...</small></p>
+          </div>
+          <hr>
+          <p style="font-size:0.85rem; color: var(--muted-color);">Or use a Personal Access Token:</p>
+        </div>
+
+        <div class="pat-form">
+          <label for="pat-input">
+            Personal Access Token
+            <input type="password" id="pat-input" placeholder="ghp_... or github_pat_...">
+          </label>
+          <div id="auth-error" class="auth-error"></div>
+          <button id="pat-submit">Sign in</button>
+          <details style="margin-top:1rem;">
+            <summary>How to create a token</summary>
+            <div class="scope-list">
+              <p style="margin-bottom:0.5rem;"><strong>Option A — Fine-grained token</strong> (recommended, read-only):</p>
+              <ol>
+                <li>Go to <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">Fine-grained tokens</a></li>
+                <li>Select repositories: <strong>All repositories</strong></li>
+                <li>Under <strong>Repository permissions</strong>, grant:
+                  <ul>
+                    <li><code>Issues</code> — Read-only</li>
+                    <li><code>Pull requests</code> — Read-only</li>
+                    <li><code>Metadata</code> — Read-only (auto-selected)</li>
+                  </ul>
+                </li>
+                <li>Click <strong>Generate token</strong> and paste it above</li>
+              </ol>
+              <p style="font-size:0.8rem;"><em>Note: Fine-grained tokens do not support the Notifications API. The Notifications section will be unavailable.</em></p>
+              <p style="margin-bottom:0.5rem;"><strong>Option B — Classic token</strong> (needed for notifications):</p>
+              <ol>
+                <li>Go to <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener">New classic token</a></li>
+                <li>Select scopes: <code>notifications</code>, <code>read:user</code></li>
+                <li>For private repo access, <code>repo</code> is also required — note this grants full read/write access, as classic tokens have no read-only repo scope</li>
+                <li>Click <strong>Generate token</strong> and paste it above</li>
+              </ol>
+              <p style="font-size:0.8rem;"><em>Classic tokens lack fine-grained permissions. If you only work with public repos, <code>public_repo</code> + <code>notifications</code> + <code>read:user</code> is sufficient and safer.</em></p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard">
+      <div class="dash-header">
+        <div class="user-info">
+          <img id="user-avatar" src="" alt="">
+          <span id="user-name"></span>
+        </div>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <button id="refresh-all-btn" class="outline" style="margin:0;padding:0.25rem 0.75rem;font-size:0.8rem;width:auto;">Refresh All</button>
+          <button id="sign-out-btn" class="secondary outline" style="margin:0;padding:0.25rem 0.75rem;font-size:0.8rem;width:auto;">Sign out</button>
+        </div>
+      </div>
+
+      <div id="rate-limit-banner" class="rate-limit-banner"></div>
+
+      <div class="settings-bar" id="settings-bar"></div>
+
+      <div class="sections-grid" id="sections-grid"></div>
+    </div>
+
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // ── Config ──
+      const CONFIG = {
+        WORKER_URL: '',       // Set to Cloudflare Worker URL to enable Device Flow
+        CLIENT_ID: '',        // GitHub App client ID (for Device Flow)
+        SCOPES: 'repo notifications read:user',
+        POLL_INTERVAL: 5000,
+        REFRESH_INTERVAL: 300000, // 5 min
+      };
+
+      const SECTIONS = [
+        { id: 'prs-authored',  title: 'PRs Authored by Me',       type: 'search', query: q => `type:pr state:open author:${q}` },
+        { id: 'prs-review',    title: 'PRs Requesting My Review',  type: 'search', query: q => `type:pr state:open review-requested:${q}` },
+        { id: 'issues-assigned', title: 'Issues Assigned to Me',   type: 'search', query: q => `type:issue state:open assignee:${q}` },
+        { id: 'issues-authored', title: 'Issues Authored by Me',   type: 'search', query: q => `type:issue state:open author:${q}` },
+        { id: 'notifications',   title: 'Notifications',           type: 'notifications' },
+      ];
+
+      // ── Auth ──
+      const getToken = () => sessionStorage.getItem('gh-token');
+      const setToken = t => sessionStorage.setItem('gh-token', t);
+      const clearToken = () => { sessionStorage.removeItem('gh-token'); sessionStorage.removeItem('gh-user'); };
+
+      // ── API ──
+      let rateLimitRemaining = null;
+      let rateLimitReset = null;
+
+      async function apiFetch(path, opts = {}) {
+        const token = getToken();
+        if (!token) throw new Error('No token');
+        const res = await fetch('https://api.github.com' + path, {
+          ...opts,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            ...opts.headers,
+          },
+        });
+
+        const rl = res.headers.get('X-RateLimit-Remaining');
+        const rr = res.headers.get('X-RateLimit-Reset');
+        if (rl !== null) rateLimitRemaining = parseInt(rl, 10);
+        if (rr !== null) rateLimitReset = parseInt(rr, 10);
+        updateRateLimitBanner();
+
+        if (res.status === 401) {
+          clearToken();
+          showScreen('auth', 'Session expired. Please sign in again.');
+          throw new Error('Unauthorized');
+        }
+        if (res.status === 403 && rateLimitRemaining === 0) {
+          throw new Error('Rate limited');
+        }
+        if (!res.ok) throw new Error(`API error ${res.status}`);
+        return res.json();
+      }
+
+      function updateRateLimitBanner() {
+        const banner = document.getElementById('rate-limit-banner');
+        if (rateLimitRemaining !== null && rateLimitRemaining < 10) {
+          const resetDate = new Date(rateLimitReset * 1000);
+          banner.textContent = `API rate limit low (${rateLimitRemaining} remaining). Resets at ${resetDate.toLocaleTimeString()}.`;
+          banner.classList.add('visible');
+        } else {
+          banner.classList.remove('visible');
+        }
+      }
+
+      async function fetchCurrentUser() {
+        const cached = sessionStorage.getItem('gh-user');
+        if (cached) return JSON.parse(cached);
+        const user = await apiFetch('/user');
+        sessionStorage.setItem('gh-user', JSON.stringify({ login: user.login, avatar_url: user.avatar_url, name: user.name }));
+        return user;
+      }
+
+      async function searchIssues(query) {
+        const data = await apiFetch(`/search/issues?q=${encodeURIComponent(query)}&per_page=50&sort=updated&order=desc`);
+        return data.items || [];
+      }
+
+      async function fetchNotifications() {
+        try {
+          return await apiFetch('/notifications?per_page=50');
+        } catch (err) {
+          if (err.message.includes('403') || err.message.includes('404')) {
+            throw new Error('Notifications require a classic token with the "notifications" scope. Fine-grained tokens do not support this API.');
+          }
+          throw err;
+        }
+      }
+
+      async function markNotificationRead(threadId) {
+        await apiFetch(`/notifications/threads/${threadId}`, { method: 'PATCH' });
+      }
+
+      // ── Time helper ──
+      function timeAgo(dateStr) {
+        const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+        if (seconds < 60) return 'just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        if (days < 30) return `${days}d ago`;
+        return new Date(dateStr).toLocaleDateString();
+      }
+
+      // ── Text color for label contrast ──
+      function contrastColor(hexBg) {
+        const r = parseInt(hexBg.substr(0, 2), 16);
+        const g = parseInt(hexBg.substr(2, 2), 16);
+        const b = parseInt(hexBg.substr(4, 2), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.5 ? '#000' : '#fff';
+      }
+
+      // ── Preferences ──
+      const DEFAULT_PREFS = Object.fromEntries(SECTIONS.map(s => [s.id, true]));
+
+      function loadPrefs() {
+        try {
+          const stored = localStorage.getItem('gh-dash-prefs');
+          if (stored) return { ...DEFAULT_PREFS, ...JSON.parse(stored) };
+        } catch {}
+        return { ...DEFAULT_PREFS };
+      }
+
+      function savePrefs(prefs) {
+        localStorage.setItem('gh-dash-prefs', JSON.stringify(prefs));
+      }
+
+      // ── Rendering ──
+      function renderItems(items) {
+        if (!items.length) return '<div class="empty-state">Nothing here!</div>';
+        const lis = items.map(item => {
+          const repo = item.repository_url ? item.repository_url.replace('https://api.github.com/repos/', '') : '';
+          const labels = (item.labels || []).map(l =>
+            `<span class="label-pill" style="background:#${l.color};color:${contrastColor(l.color)}">${escapeHtml(l.name)}</span>`
+          ).join('');
+          return `<li>
+            <img class="item-avatar" src="${item.user?.avatar_url || ''}" alt="" loading="lazy">
+            <div class="item-content">
+              <div class="item-repo">${escapeHtml(repo)}</div>
+              <div class="item-title"><a href="${item.html_url}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a></div>
+              <div class="item-meta">${labels}<span class="item-time">${timeAgo(item.updated_at)}</span></div>
+            </div>
+          </li>`;
+        }).join('');
+        return `<ul class="item-list">${lis}</ul>`;
+      }
+
+      function renderNotifications(items) {
+        if (!items.length) return '<div class="empty-state">No notifications!</div>';
+        const grouped = {};
+        for (const n of items) {
+          const repo = n.repository?.full_name || 'Unknown';
+          if (!grouped[repo]) grouped[repo] = [];
+          grouped[repo].push(n);
+        }
+        let html = '';
+        for (const [repo, notifs] of Object.entries(grouped)) {
+          html += `<div class="notif-group-header">${escapeHtml(repo)}</div>`;
+          for (const n of notifs) {
+            const unread = n.unread ? 'notif-unread' : '';
+            const dotClass = n.unread ? '' : ' read';
+            const markBtn = n.unread ? `<button onclick="window._markRead('${n.id}', this)">Mark read</button>` : '';
+            html += `<div class="notif-item ${unread}">
+              <span class="notif-dot${dotClass}"></span>
+              <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(n.subject?.title || '')}</span>
+              <span class="item-time">${timeAgo(n.updated_at)}</span>
+              ${markBtn}
+            </div>`;
+          }
+        }
+        return html;
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      // ── Section management ──
+      const sectionData = {};
+
+      function buildSections() {
+        const grid = document.getElementById('sections-grid');
+        const settingsBar = document.getElementById('settings-bar');
+        const prefs = loadPrefs();
+
+        grid.innerHTML = '';
+        settingsBar.innerHTML = '';
+
+        for (const sec of SECTIONS) {
+          // Toggle
+          const label = document.createElement('label');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = prefs[sec.id];
+          cb.addEventListener('change', () => {
+            const p = loadPrefs();
+            p[sec.id] = cb.checked;
+            savePrefs(p);
+            const card = document.getElementById(`section-${sec.id}`);
+            card.classList.toggle('hidden', !cb.checked);
+            if (cb.checked && !sectionData[sec.id]) refreshSection(sec.id);
+          });
+          label.appendChild(cb);
+          label.appendChild(document.createTextNode(sec.title));
+          settingsBar.appendChild(label);
+
+          // Card
+          const card = document.createElement('div');
+          card.className = `section-card section-${sec.id}${prefs[sec.id] ? '' : ' hidden'}`;
+          card.id = `section-${sec.id}`;
+          card.innerHTML = `
+            <div class="section-card-header">
+              <h2>${escapeHtml(sec.title)} <span class="badge" id="badge-${sec.id}" style="display:none">0</span></h2>
+              <button onclick="window._refreshSection('${sec.id}')">Refresh</button>
+            </div>
+            <div class="section-card-body" id="body-${sec.id}">
+              <div class="spinner"></div>
+            </div>
+            <div class="section-card-footer" id="footer-${sec.id}"></div>
+          `;
+          grid.appendChild(card);
+        }
+      }
+
+      async function refreshSection(sectionId) {
+        const sec = SECTIONS.find(s => s.id === sectionId);
+        if (!sec) return;
+        const body = document.getElementById(`body-${sectionId}`);
+        const badge = document.getElementById(`badge-${sectionId}`);
+        const footer = document.getElementById(`footer-${sectionId}`);
+        body.innerHTML = '<div class="spinner"></div>';
+
+        try {
+          let items, html, count;
+          if (sec.type === 'search') {
+            const user = await fetchCurrentUser();
+            items = await searchIssues(sec.query(user.login));
+            html = renderItems(items);
+            count = items.length;
+          } else {
+            items = await fetchNotifications();
+            html = renderNotifications(items);
+            count = items.filter(n => n.unread).length;
+          }
+          body.innerHTML = html;
+          sectionData[sectionId] = items;
+          badge.textContent = count;
+          badge.style.display = count > 0 ? '' : 'none';
+          footer.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        } catch (err) {
+          if (err.message === 'Unauthorized') return;
+          body.innerHTML = `<div class="error-state">${escapeHtml(err.message)}<br><button onclick="window._refreshSection('${sectionId}')">Retry</button></div>`;
+        }
+      }
+
+      async function refreshAll() {
+        const prefs = loadPrefs();
+        const promises = SECTIONS.filter(s => prefs[s.id]).map(s => refreshSection(s.id));
+        await Promise.allSettled(promises);
+      }
+
+      // Expose to inline onclick handlers
+      window._refreshSection = refreshSection;
+      window._markRead = async (threadId, btn) => {
+        btn.disabled = true;
+        try {
+          await markNotificationRead(threadId);
+          btn.closest('.notif-item').classList.remove('notif-unread');
+          btn.closest('.notif-item').querySelector('.notif-dot').classList.add('read');
+          btn.remove();
+        } catch { btn.disabled = false; }
+      };
+
+      // ── Screen management ──
+      function showScreen(screen, errorMsg) {
+        document.getElementById('auth-screen').classList.toggle('active', screen === 'auth');
+        document.getElementById('dashboard').classList.toggle('active', screen === 'dashboard');
+        if (errorMsg) {
+          const el = document.getElementById('auth-error');
+          el.textContent = errorMsg;
+          el.classList.add('visible');
+        }
+      }
+
+      // ── PAT Auth ──
+      function initPATAuth() {
+        const input = document.getElementById('pat-input');
+        const btn = document.getElementById('pat-submit');
+        const error = document.getElementById('auth-error');
+
+        btn.addEventListener('click', async () => {
+          const token = input.value.trim();
+          if (!token) { error.textContent = 'Please enter a token.'; error.classList.add('visible'); return; }
+          btn.setAttribute('aria-busy', 'true');
+          btn.disabled = true;
+          error.classList.remove('visible');
+          setToken(token);
+          try {
+            const user = await fetchCurrentUser();
+            sessionStorage.removeItem('gh-user'); // clear cache to re-fetch
+            await initDashboard();
+          } catch (err) {
+            clearToken();
+            error.textContent = 'Invalid token. Please check and try again.';
+            error.classList.add('visible');
+          } finally {
+            btn.removeAttribute('aria-busy');
+            btn.disabled = false;
+          }
+        });
+
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+      }
+
+      // ── Device Flow Auth ──
+      function initDeviceFlow() {
+        if (!CONFIG.WORKER_URL || !CONFIG.CLIENT_ID) return;
+        document.getElementById('device-flow-section').style.display = '';
+
+        const btn = document.getElementById('device-flow-btn');
+        const info = document.getElementById('device-flow-info');
+        const codeEl = document.getElementById('user-code');
+
+        btn.addEventListener('click', async () => {
+          btn.setAttribute('aria-busy', 'true');
+          btn.disabled = true;
+          try {
+            const res = await fetch(`${CONFIG.WORKER_URL}/login/device/code`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ client_id: CONFIG.CLIENT_ID, scope: CONFIG.SCOPES }),
+            });
+            const data = await res.json();
+            codeEl.textContent = data.user_code;
+            info.classList.add('active');
+            window.open(`https://github.com/login/device`, '_blank');
+            pollDeviceFlow(data.device_code, data.interval || 5);
+          } catch (err) {
+            const error = document.getElementById('auth-error');
+            error.textContent = 'Device flow failed. Try using a Personal Access Token.';
+            error.classList.add('visible');
+            btn.removeAttribute('aria-busy');
+            btn.disabled = false;
+          }
+        });
+      }
+
+      async function pollDeviceFlow(deviceCode, interval) {
+        const poll = async () => {
+          try {
+            const res = await fetch(`${CONFIG.WORKER_URL}/login/oauth/access_token`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                client_id: CONFIG.CLIENT_ID,
+                device_code: deviceCode,
+                grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+              }),
+            });
+            const data = await res.json();
+            if (data.access_token) {
+              setToken(data.access_token);
+              await initDashboard();
+              return;
+            }
+            if (data.error === 'slow_down') {
+              interval = (data.interval || interval + 5);
+            } else if (data.error === 'expired_token' || data.error === 'access_denied') {
+              document.getElementById('auth-error').textContent =
+                data.error === 'expired_token' ? 'Code expired. Please try again.' : 'Access denied.';
+              document.getElementById('auth-error').classList.add('visible');
+              document.getElementById('device-flow-info').classList.remove('active');
+              document.getElementById('device-flow-btn').removeAttribute('aria-busy');
+              document.getElementById('device-flow-btn').disabled = false;
+              return;
+            }
+            // authorization_pending — keep polling
+            setTimeout(poll, interval * 1000);
+          } catch {
+            setTimeout(poll, interval * 1000);
+          }
+        };
+        setTimeout(poll, interval * 1000);
+      }
+
+      // ── Dashboard init ──
+      async function initDashboard() {
+        const user = await fetchCurrentUser();
+        document.getElementById('user-avatar').src = user.avatar_url;
+        document.getElementById('user-name').textContent = user.name || user.login;
+        showScreen('dashboard');
+        buildSections();
+        refreshAll();
+      }
+
+      // ── Sign out ──
+      document.getElementById('sign-out-btn').addEventListener('click', () => {
+        clearToken();
+        showScreen('auth');
+        document.getElementById('pat-input').value = '';
+        document.getElementById('auth-error').classList.remove('visible');
+      });
+
+      // ── Refresh all button ──
+      document.getElementById('refresh-all-btn').addEventListener('click', () => refreshAll());
+
+      // ── Auto-refresh ──
+      setInterval(() => {
+        if (getToken()) refreshAll();
+      }, CONFIG.REFRESH_INTERVAL);
+
+      // ── Init ──
+      initPATAuth();
+      initDeviceFlow();
+      if (getToken()) {
+        initDashboard().catch(() => showScreen('auth', 'Session expired. Please sign in again.'));
+      } else {
+        showScreen('auth');
+      }
+    })();
+  </script>
+</body>
+</html>
