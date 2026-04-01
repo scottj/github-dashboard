@@ -285,6 +285,8 @@
       border-bottom: 1px solid var(--border);
       font-size: 0.825rem;
       transition: background 0.1s ease;
+      position: relative;
+      cursor: pointer;
     }
     .item-list li:hover { background: var(--accent-subtle); }
     .item-list li:last-child { border-bottom: none; }
@@ -308,6 +310,11 @@
     }
     .item-title a:hover {
       color: var(--accent-text);
+    }
+    .item-title a::after {
+      content: '';
+      position: absolute;
+      inset: 0;
     }
     .item-meta {
       display: flex;
