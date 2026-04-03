@@ -558,19 +558,22 @@
       // ── API ──
       let rateLimitRemaining = null;
       let rateLimitReset = null;
+      const etagCache = {};
 
       async function apiFetch(path, opts = {}) {
         const token = getToken();
         if (!token) throw new Error('No token');
-        const res = await fetch('https://api.github.com' + path, {
-          ...opts,
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-            ...opts.headers,
-          },
-        });
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...opts.headers,
+        };
+        const cached = etagCache[path];
+        if (cached && !opts.method) {
+          headers['If-None-Match'] = cached.etag;
+        }
+        const res = await fetch('https://api.github.com' + path, { ...opts, headers });
 
         const rl = res.headers.get('X-RateLimit-Remaining');
         const rr = res.headers.get('X-RateLimit-Reset');
@@ -578,6 +581,9 @@
         if (rr !== null) rateLimitReset = parseInt(rr, 10);
         updateRateLimitBanner();
 
+        if (res.status === 304 && cached) {
+          return cached.data;
+        }
         if (res.status === 401) {
           clearToken();
           showScreen('auth', 'Session expired. Please sign in again.');
@@ -587,7 +593,12 @@
           throw new Error('Rate limited');
         }
         if (!res.ok) throw new Error(`API error ${res.status}`);
-        return res.json();
+        const data = await res.json();
+        const etag = res.headers.get('ETag');
+        if (etag && !opts.method) {
+          etagCache[path] = { etag, data };
+        }
+        return data;
       }
 
       function updateRateLimitBanner() {
@@ -712,10 +723,10 @@
         return html;
       }
 
+      const _escapeDiv = document.createElement('div');
       function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        _escapeDiv.textContent = str;
+        return _escapeDiv.innerHTML;
       }
 
       // ── Section management ──
@@ -767,7 +778,7 @@
         }
       }
 
-      async function refreshSection(sectionId) {
+      async function refreshSection(sectionId, user) {
         const sec = SECTIONS.find(s => s.id === sectionId);
         if (!sec) return;
         const body = document.getElementById(`body-${sectionId}`);
@@ -778,7 +789,7 @@
         try {
           let items, html, count;
           if (sec.type === 'search') {
-            const user = await fetchCurrentUser();
+            if (!user) user = await fetchCurrentUser();
             items = await searchIssues(sec.query(user.login));
             html = renderItems(items);
             count = items.length;
@@ -800,7 +811,8 @@
 
       async function refreshAll() {
         const prefs = loadPrefs();
-        const promises = visibleSections().filter(s => prefs[s.id]).map(s => refreshSection(s.id));
+        const user = await fetchCurrentUser();
+        const promises = visibleSections().filter(s => prefs[s.id]).map(s => refreshSection(s.id, user));
         await Promise.allSettled(promises);
       }
 
