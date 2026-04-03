@@ -536,9 +536,9 @@
       };
 
       const SECTIONS = [
-        { id: 'prs-authored',  title: 'PRs Authored by Me',       type: 'search', query: q => `type:pr state:open author:${q}` },
         { id: 'prs-review',    title: 'PRs Requesting My Review',  type: 'search', query: q => `type:pr state:open review-requested:${q}` },
         { id: 'issues-assigned', title: 'Issues Assigned to Me',   type: 'search', query: q => `type:issue state:open assignee:${q}` },
+        { id: 'prs-authored',  title: 'PRs Authored by Me',       type: 'search', query: q => `type:pr state:open author:${q}` },
         { id: 'issues-authored', title: 'Issues Authored by Me',   type: 'search', query: q => `type:issue state:open author:${q}` },
         { id: 'notifications',   title: 'Notifications',           type: 'notifications' },
       ];
