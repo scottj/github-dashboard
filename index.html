@@ -791,7 +791,7 @@
           sectionData[sectionId] = items;
           badge.textContent = count;
           badge.style.display = count > 0 ? '' : 'none';
-          footer.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+          footer.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
         } catch (err) {
           if (err.message === 'Unauthorized') return;
           body.innerHTML = `<div class="error-state">${escapeHtml(err.message)}<br><button onclick="window._refreshSection('${sectionId}')">Retry</button></div>`;
