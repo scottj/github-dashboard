@@ -544,9 +544,16 @@
       ];
 
       // ── Auth ──
-      const getToken = () => sessionStorage.getItem('gh-token');
-      const setToken = t => sessionStorage.setItem('gh-token', t);
-      const clearToken = () => { sessionStorage.removeItem('gh-token'); sessionStorage.removeItem('gh-user'); };
+      const isClassicToken = t => t.startsWith('ghp_') || t.startsWith('gho_');
+      const getToken = () => localStorage.getItem('gh-token') || sessionStorage.getItem('gh-token');
+      const setToken = t => {
+        if (isClassicToken(t)) { sessionStorage.setItem('gh-token', t); localStorage.removeItem('gh-token'); }
+        else { localStorage.setItem('gh-token', t); sessionStorage.removeItem('gh-token'); }
+      };
+      const clearToken = () => {
+        localStorage.removeItem('gh-token'); localStorage.removeItem('gh-user');
+        sessionStorage.removeItem('gh-token'); sessionStorage.removeItem('gh-user');
+      };
 
       // ── API ──
       let rateLimitRemaining = null;
@@ -713,6 +720,8 @@
 
       // ── Section management ──
       const sectionData = {};
+      const supportsNotifications = () => { const t = getToken(); return t && isClassicToken(t); };
+      const visibleSections = () => supportsNotifications() ? SECTIONS : SECTIONS.filter(s => s.type !== 'notifications');
 
       function buildSections() {
         const grid = document.getElementById('sections-grid');
@@ -722,7 +731,7 @@
         grid.innerHTML = '';
         settingsBar.innerHTML = '';
 
-        for (const sec of SECTIONS) {
+        for (const sec of visibleSections()) {
           // Toggle
           const label = document.createElement('label');
           const cb = document.createElement('input');
@@ -791,7 +800,7 @@
 
       async function refreshAll() {
         const prefs = loadPrefs();
-        const promises = SECTIONS.filter(s => prefs[s.id]).map(s => refreshSection(s.id));
+        const promises = visibleSections().filter(s => prefs[s.id]).map(s => refreshSection(s.id));
         await Promise.allSettled(promises);
       }
 
