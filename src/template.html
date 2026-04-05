@@ -34,7 +34,7 @@
           <p class="text-sm-muted">Or use a Personal Access Token:</p>
         </div>
 
-        <div class="pat-form">
+        <form class="pat-form" onsubmit="return false">
           <label for="pat-input">
             Personal Access Token
             <input type="password" id="pat-input" placeholder="ghp_... or github_pat_...">
@@ -68,7 +68,7 @@
               <p class="text-xs-italic"><em>Classic tokens lack fine-grained permissions. If you only work with public repos, <code>public_repo</code> + <code>notifications</code> + <code>read:user</code> is sufficient and safer.</em></p>
             </div>
           </details>
-        </div>
+        </form>
       </div>
     </div>
 
