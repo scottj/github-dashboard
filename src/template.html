@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="{{CSP}}">
+  <title>GitHub Dashboard</title>
+  <link rel="preconnect" href="https://api.github.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+{{STYLES}}
+  </style>
+</head>
+<body>
+  <main class="container">
+
+    <!-- Auth Screen -->
+    <div id="auth-screen">
+      <div class="auth-container">
+        <h1>GitHub Dashboard</h1>
+        <p class="subtitle">See what needs your attention across all your repos.</p>
+
+        <div id="device-flow-section">
+          <button id="device-flow-btn" class="contrast">Sign in with GitHub</button>
+          <div id="device-flow-info" class="device-flow-info">
+            <p>Go to <a href="https://github.com/login/device" target="_blank" rel="noopener">github.com/login/device</a> and enter this code:</p>
+            <div id="user-code" class="user-code"></div>
+            <p><small>Waiting for authorization...</small></p>
+          </div>
+          <hr>
+          <p class="text-sm-muted">Or use a Personal Access Token:</p>
+        </div>
+
+        <div class="pat-form">
+          <label for="pat-input">
+            Personal Access Token
+            <input type="password" id="pat-input" placeholder="ghp_... or github_pat_...">
+          </label>
+          <div id="auth-error" class="auth-error"></div>
+          <button id="pat-submit">Sign in</button>
+          <details class="token-details">
+            <summary>How to create a token</summary>
+            <div class="scope-list">
+              <p class="mb-half"><strong>Option A — Fine-grained token</strong> (recommended, read-only):</p>
+              <ol>
+                <li>Go to <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">Fine-grained tokens</a></li>
+                <li>Select repositories: <strong>All repositories</strong></li>
+                <li>Under <strong>Repository permissions</strong>, grant:
+                  <ul>
+                    <li><code>Issues</code> — Read-only</li>
+                    <li><code>Pull requests</code> — Read-only</li>
+                    <li><code>Metadata</code> — Read-only (auto-selected)</li>
+                  </ul>
+                </li>
+                <li>Click <strong>Generate token</strong> and paste it above</li>
+              </ol>
+              <p class="text-xs-italic"><em>Note: Fine-grained tokens do not support the Notifications API. The Notifications section will be unavailable.</em></p>
+              <p class="mb-half"><strong>Option B — Classic token</strong> (needed for notifications):</p>
+              <ol>
+                <li>Go to <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener">New classic token</a></li>
+                <li>Select scopes: <code>notifications</code>, <code>read:user</code></li>
+                <li>For private repo access, <code>repo</code> is also required — note this grants full read/write access, as classic tokens have no read-only repo scope</li>
+                <li>Click <strong>Generate token</strong> and paste it above</li>
+              </ol>
+              <p class="text-xs-italic"><em>Classic tokens lack fine-grained permissions. If you only work with public repos, <code>public_repo</code> + <code>notifications</code> + <code>read:user</code> is sufficient and safer.</em></p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard">
+      <div class="dash-header">
+        <div class="user-info">
+          <img id="user-avatar" src="" alt="">
+          <span id="user-name"></span>
+        </div>
+        <div class="header-actions">
+          <button id="refresh-all-btn" class="outline">Refresh All</button>
+          <button id="sign-out-btn" class="secondary outline">Sign out</button>
+        </div>
+      </div>
+
+      <div id="rate-limit-banner" class="rate-limit-banner"></div>
+
+      <div class="settings-bar" id="settings-bar"></div>
+
+      <div class="sections-grid" id="sections-grid"></div>
+    </div>
+
+  </main>
+
+  <script>
+{{SCRIPT}}
+  </script>
+</body>
+</html>
