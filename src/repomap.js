@@ -310,12 +310,6 @@
         el.appendChild(metric);
       }
 
-      if (repo.language && LANG_COLORS[repo.language] && tile.w > 18 && tile.h > 18) {
-        const dot = document.createElement('span');
-        dot.className = 'tile-lang-dot';
-        dot.style.background = LANG_COLORS[repo.language];
-        el.appendChild(dot);
-      }
 
       el.addEventListener('mouseenter', showTooltip.bind(null, repo));
       el.addEventListener('mousemove', moveTooltip);
@@ -377,14 +371,27 @@
       ['Pushed', `${timeAgo(repo.pushed_at)} · ${new Date(repo.pushed_at).toLocaleDateString()}`],
       ['Size', formatSize(repo.size)],
     ];
-    if (repo.language) metaItems.push(['Language', repo.language]);
-
     for (const [key, val] of metaItems) {
       const p = document.createElement('p');
       const strong = document.createElement('strong');
       strong.textContent = key + ': ';
       p.appendChild(strong);
       p.appendChild(document.createTextNode(val));
+      meta.appendChild(p);
+    }
+
+    if (repo.language) {
+      const p = document.createElement('p');
+      const strong = document.createElement('strong');
+      strong.textContent = 'Language: ';
+      p.appendChild(strong);
+      if (LANG_COLORS[repo.language]) {
+        const dot = document.createElement('span');
+        dot.className = 'tile-lang-dot';
+        dot.style.cssText = `background:${LANG_COLORS[repo.language]};position:static;display:inline-block;vertical-align:middle;margin-right:4px`;
+        p.appendChild(dot);
+      }
+      p.appendChild(document.createTextNode(repo.language));
       meta.appendChild(p);
     }
     tooltip.appendChild(meta);
