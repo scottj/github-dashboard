@@ -2,68 +2,79 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Push-Location "$PSScriptRoot/.."
 try {
-    # Phase 1: Assemble src/template.html + src/styles.css + src/app.js into a temp file
-    $Styles = (Get-Content -Raw src/styles.css) -replace "`r`n", "`n"
-    $Script = (Get-Content -Raw src/app.js) -replace "`r`n", "`n"
-    $Template = (Get-Content -Raw src/template.html) -replace "`r`n", "`n"
+    function Build-Page {
+        param(
+            [string]$Template,
+            [string]$Styles,
+            [string]$Script,
+            [string]$Output
+        )
 
-    $Assembled = $Template.Replace('{{STYLES}}', $Styles).Replace('{{SCRIPT}}', $Script).Replace('{{CSP}}', 'PLACEHOLDER_CSP')
-    [System.IO.File]::WriteAllText("$PWD/.build-assembled.html", $Assembled, [System.Text.UTF8Encoding]::new($false))
+        $Assembled = ".build-assembled-$Output"
+        $Minified  = ".build-minified-$Output"
 
-    # Phase 2: Minify the assembled HTML
-    bunx html-minifier-terser `
-        --collapse-boolean-attributes `
-        --collapse-whitespace `
-        --decode-entities `
-        --minify-css true `
-        --minify-js true `
-        --remove-comments `
-        --remove-empty-attributes `
-        --remove-redundant-attributes `
-        --remove-script-type-attributes `
-        --remove-style-link-type-attributes `
-        --sort-attributes `
-        --sort-class-name `
-        --trim-custom-fragments `
-        --use-short-doctype `
-        --process-conditional-comments `
-        -o .build-minified.html `
-        .build-assembled.html
+        # Phase 1: Assemble template + styles + script
+        $StylesContent   = (Get-Content -Raw $Styles) -replace "`r`n", "`n"
+        $ScriptContent   = (Get-Content -Raw $Script) -replace "`r`n", "`n"
+        $TemplateContent = (Get-Content -Raw $Template) -replace "`r`n", "`n"
 
-    # Phase 3: Compute hashes and replace CSP placeholder
-    $Minified = [System.IO.File]::ReadAllText("$PWD/.build-minified.html")
+        $AssembledContent = $TemplateContent.Replace('{{STYLES}}', $StylesContent).Replace('{{SCRIPT}}', $ScriptContent).Replace('{{CSP}}', 'PLACEHOLDER_CSP')
+        [System.IO.File]::WriteAllText("$PWD/$Assembled", $AssembledContent, [System.Text.UTF8Encoding]::new($false))
 
-    if ($Minified -match '(?s)<style>(.*?)</style>') {
-        $StyleContent = $Matches[1]
-    } else {
-        throw "Could not extract style content"
+        # Phase 2: Minify
+        bunx html-minifier-terser `
+            --collapse-boolean-attributes `
+            --collapse-whitespace `
+            --decode-entities `
+            --minify-css true `
+            --minify-js true `
+            --remove-comments `
+            --remove-empty-attributes `
+            --remove-redundant-attributes `
+            --remove-script-type-attributes `
+            --remove-style-link-type-attributes `
+            --sort-attributes `
+            --sort-class-name `
+            --trim-custom-fragments `
+            --use-short-doctype `
+            --process-conditional-comments `
+            -o $Minified `
+            $Assembled
+
+        # Phase 3: Compute CSP hashes and write final output
+        $MinifiedContent = [System.IO.File]::ReadAllText("$PWD/$Minified")
+
+        if ($MinifiedContent -match '(?s)<style>(.*?)</style>') {
+            $StyleBlock = $Matches[1]
+        } else {
+            throw "Could not extract style content from $Minified"
+        }
+
+        if ($MinifiedContent -match '(?s)<script>(.*?)</script>') {
+            $ScriptBlock = $Matches[1]
+        } else {
+            throw "Could not extract script content from $Minified"
+        }
+
+        $Sha256 = [System.Security.Cryptography.SHA256]::Create()
+
+        $StyleHash  = [Convert]::ToBase64String($Sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($StyleBlock)))
+        $ScriptHash = [Convert]::ToBase64String($Sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($ScriptBlock)))
+
+        $CSP = "default-src 'self'; script-src 'sha256-$ScriptHash'; style-src 'sha256-$StyleHash' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://avatars.githubusercontent.com https://*.githubusercontent.com data:; connect-src https://api.github.com"
+
+        $Final = $MinifiedContent.Replace('PLACEHOLDER_CSP', $CSP)
+        [System.IO.File]::WriteAllText("$PWD/$Output", $Final, [System.Text.UTF8Encoding]::new($false))
+
+        Remove-Item -Force $Assembled, $Minified -ErrorAction SilentlyContinue
+
+        Write-Host "Build complete: $Output"
+        Write-Host "  Style hash:  sha256-$StyleHash"
+        Write-Host "  Script hash: sha256-$ScriptHash"
     }
 
-    if ($Minified -match '(?s)<script>(.*?)</script>') {
-        $ScriptContent = $Matches[1]
-    } else {
-        throw "Could not extract script content"
-    }
-
-    $Sha256 = [System.Security.Cryptography.SHA256]::Create()
-
-    $StyleBytes = [System.Text.Encoding]::UTF8.GetBytes($StyleContent)
-    $StyleHash = [Convert]::ToBase64String($Sha256.ComputeHash($StyleBytes))
-
-    $ScriptBytes = [System.Text.Encoding]::UTF8.GetBytes($ScriptContent)
-    $ScriptHash = [Convert]::ToBase64String($Sha256.ComputeHash($ScriptBytes))
-
-    $CSP = "default-src 'self'; script-src 'sha256-$ScriptHash'; style-src 'sha256-$StyleHash' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://avatars.githubusercontent.com https://*.githubusercontent.com data:; connect-src https://api.github.com"
-
-    $Final = $Minified.Replace('PLACEHOLDER_CSP', $CSP)
-    [System.IO.File]::WriteAllText("$PWD/index.html", $Final, [System.Text.UTF8Encoding]::new($false))
-
-    # Cleanup
-    Remove-Item -Force .build-assembled.html, .build-minified.html -ErrorAction SilentlyContinue
-
-    Write-Host "Build complete: index.html"
-    Write-Host "  Style hash:  sha256-$StyleHash"
-    Write-Host "  Script hash: sha256-$ScriptHash"
+    Build-Page -Template src/index.template.html   -Styles src/styles.css   -Script src/app.js     -Output index.html
+    Build-Page -Template src/repomap.template.html -Styles src/repomap.css  -Script src/repomap.js -Output repomap.html
 } finally {
     Pop-Location
 }

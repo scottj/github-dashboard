@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="{{CSP}}">
+  <title>GitHub Repo Map</title>
+  <link rel="preconnect" href="https://api.github.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+{{STYLES}}
+  </style>
+</head>
+<body>
+  <main class="container">
+
+    <!-- Auth Screen -->
+    <div id="auth-screen">
+      <div class="auth-container">
+        <h1>GitHub Repo Map</h1>
+        <p class="subtitle">Visualize your repositories as an interactive treemap.</p>
+
+        <div id="device-flow-section">
+          <button id="device-flow-btn" class="contrast">Sign in with GitHub</button>
+          <div id="device-flow-info" class="device-flow-info">
+            <p>Go to <a href="https://github.com/login/device" target="_blank" rel="noopener">github.com/login/device</a> and enter this code:</p>
+            <div id="user-code" class="user-code"></div>
+            <p><small>Waiting for authorization...</small></p>
+          </div>
+          <hr>
+          <p class="text-sm-muted">Or use a Personal Access Token:</p>
+        </div>
+
+        <form class="pat-form" onsubmit="return false">
+          <label for="pat-input">
+            Personal Access Token
+            <input type="password" id="pat-input" placeholder="ghp_... or github_pat_..." autocomplete="off">
+          </label>
+          <div id="auth-error" class="auth-error"></div>
+          <button id="pat-submit">Sign in</button>
+          <details class="token-details">
+            <summary>How to create a token</summary>
+            <div class="scope-list">
+              <p class="mb-half"><strong>Fine-grained token</strong> (recommended):</p>
+              <ol>
+                <li>Go to <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">Fine-grained tokens</a></li>
+                <li>Select repositories: <strong>All repositories</strong></li>
+                <li>Under <strong>Repository permissions</strong>, grant <code>Metadata</code> — Read-only</li>
+                <li>Click <strong>Generate token</strong> and paste it above</li>
+              </ol>
+              <p class="mb-half"><strong>Classic token</strong>:</p>
+              <ol>
+                <li>Go to <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener">New classic token</a></li>
+                <li>Select scope: <code>read:user</code> (add <code>repo</code> for private repos)</li>
+                <li>Click <strong>Generate token</strong> and paste it above</li>
+              </ol>
+            </div>
+          </details>
+        </form>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard">
+      <div class="dash-header">
+        <div class="user-info">
+          <img id="user-avatar" src="" alt="">
+          <span id="user-name"></span>
+        </div>
+        <div class="header-actions">
+          <a href="index.html" class="nav-link">← Dashboard</a>
+          <button id="refresh-all-btn" class="outline">Refresh</button>
+          <button id="sign-out-btn" class="secondary outline">Sign out</button>
+        </div>
+      </div>
+
+      <div id="rate-limit-banner" class="rate-limit-banner"></div>
+
+      <div class="settings-bar" id="settings-bar"></div>
+
+      <p id="repo-count" class="repo-count"></p>
+
+      <div class="repomap-treemap" id="repomap-treemap"></div>
+
+      <div class="repomap-tooltip" id="repomap-tooltip" hidden></div>
+    </div>
+
+  </main>
+
+  <script>
+{{SCRIPT}}
+  </script>
+</body>
+</html>
