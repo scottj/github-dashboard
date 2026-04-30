@@ -38,6 +38,9 @@ try {
             --trim-custom-fragments `
             --use-short-doctype `
             --process-conditional-comments `
+            --remove-attribute-quotes `
+            --remove-optional-tags `
+            --no-include-auto-generated-tags `
             -o $Minified `
             $Assembled
 
