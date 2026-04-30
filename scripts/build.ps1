@@ -41,6 +41,7 @@ try {
             --remove-attribute-quotes `
             --remove-optional-tags `
             --no-include-auto-generated-tags `
+            --max-line-length 4096 `
             -o $Minified `
             $Assembled
 
